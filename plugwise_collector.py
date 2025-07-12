@@ -12,7 +12,7 @@ import time
 import os
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, date
 from requests.auth import HTTPBasicAuth
 from pathlib import Path
 
@@ -23,6 +23,9 @@ class PlugwiseCollector:
         """Initialize the collector with configuration"""
         self.config = self.load_config(config_file)
         self.appliance_mapping = {}
+        self.current_csv_file = None
+        self.current_csv_writer = None
+        self.current_date = None
         
     def load_config(self, config_file=None):
         """Load configuration from file or use defaults"""
@@ -41,7 +44,7 @@ class PlugwiseCollector:
                     "enabled": True
                 },
                 "smile": {
-                    "ip": "192.168.178.35", 
+                    "ip": "192.168.178.35",
                     "username": "smile",
                     "password": "kngzthgf",
                     "port": 80,
@@ -56,7 +59,7 @@ class PlugwiseCollector:
             "output": {
                 "format": "csv",
                 "directory": "data",
-                "filename_pattern": "power_usage_{timestamp}.csv"
+                "filename_pattern": "power_usage_{date}.csv"
             }
         }
     
@@ -203,14 +206,46 @@ class PlugwiseCollector:
         # Smile has different data structure - can be extended later
         return {"status": "not_implemented"}
     
-    def save_to_csv(self, power_data, output_dir):
-        """Save power data to CSV file"""
-        # Ensure output directory exists
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    def get_daily_csv_file(self, output_dir):
+        """Get or create daily CSV file for current date"""
+        today = date.today()
         
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(output_dir, f"power_usage_{timestamp}.csv")
+        # Check if we need to start a new file
+        if self.current_date != today or self.current_csv_file is None:
+            # Close previous file if it exists
+            if self.current_csv_file:
+                self.current_csv_file.close()
+            
+            # Create new file for today
+            filename = os.path.join(output_dir, f"power_usage_{today.strftime('%Y%m%d')}.csv")
+            
+            # Create output directory if it doesn't exist
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            # Check if file exists to determine if we need to write header
+            file_exists = os.path.exists(filename)
+            
+            self.current_csv_file = open(filename, 'a', newline='', encoding='utf-8')
+            fieldnames = ['timestamp', 'device', 'appliance', 'power_watts', 'measurement_timestamp', 'module_id', 'meter_id']
+            self.current_csv_writer = csv.DictWriter(self.current_csv_file, fieldnames=fieldnames)
+            
+            # Write header only if file is new
+            if not file_exists:
+                self.current_csv_writer.writeheader()
+            
+            self.current_date = today
+            print(f"📁 Using daily file: {filename}")
+        
+        return self.current_csv_writer
+    
+    def save_to_daily_csv(self, power_data, output_dir):
+        """Save power data to daily CSV file"""
+        if not power_data["devices"]:
+            print("⚠️  No power data to save")
+            return None
+        
+        # Get the daily CSV writer
+        writer = self.get_daily_csv_file(output_dir)
         
         # Prepare CSV data
         csv_data = []
@@ -228,20 +263,13 @@ class PlugwiseCollector:
                             'meter_id': appliance_data.get('meter_id', '')
                         })
         
-        if csv_data:
-            # Get all unique keys
-            fieldnames = ['timestamp', 'device', 'appliance', 'power_watts', 'measurement_timestamp', 'module_id', 'meter_id']
-            
-            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(csv_data)
-            
-            print(f"✅ Saved {len(csv_data)} measurements to: {filename}")
-            return filename
-        else:
-            print("⚠️  No power data to save")
-            return None
+        # Write data to CSV
+        if csv_data and writer:
+            writer.writerows(csv_data)
+            print(f"✅ Saved {len(csv_data)} measurements to daily CSV")
+            return self.current_csv_file.name if self.current_csv_file else None
+        
+        return None
     
     def print_power_summary(self, power_data):
         """Print a nice summary of current power usage"""
@@ -282,7 +310,7 @@ class PlugwiseCollector:
             
             # Save to file
             if output_dir:
-                self.save_to_csv(power_data, output_dir)
+                self.save_to_daily_csv(power_data, output_dir)
             
             return power_data
         else:
@@ -290,8 +318,9 @@ class PlugwiseCollector:
             return None
     
     def run_continuous_collection(self, interval, output_dir=None):
-        """Run continuous data collection"""
+        """Run continuous data collection with daily file rotation"""
         print(f"🔄 Starting continuous collection (interval: {interval}s)")
+        print("📅 Data will be saved to daily CSV files (00:00-23:59)")
         print("Press Ctrl+C to stop")
         print("=" * 50)
         
@@ -303,8 +332,14 @@ class PlugwiseCollector:
                 
         except KeyboardInterrupt:
             print("\n🛑 Collection stopped by user")
+            # Close the current CSV file
+            if self.current_csv_file:
+                self.current_csv_file.close()
         except Exception as e:
             print(f"\n❌ Collection error: {e}")
+            # Close the current CSV file
+            if self.current_csv_file:
+                self.current_csv_file.close()
 
 def main():
     """Main CLI entry point"""

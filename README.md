@@ -28,7 +28,6 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 
 2. **Install dependencies:**
    ```bash
-   pip install -r requirements.txt
    ```
 
 3. **Configure your devices:**
@@ -62,9 +61,10 @@ python plugwise_collector.py --single --output data/
 
 ### Continuous Collection
 
-Collect data every 60 seconds:
+Collect data every 60 seconds with daily file rotation:
 ```bash
 python plugwise_collector.py --continuous --interval 60 --output data/
+# Creates: power_usage_20250712.csv, power_usage_20250713.csv, etc.
 ```
 
 ### Custom Configuration
@@ -84,7 +84,7 @@ python plugwise_collector.py --config my_config.json --continuous
 
 ## Output Format
 
-The collector creates CSV files with the following columns:
+The collector creates daily CSV files (00:00-23:59) with the following columns:
 - `timestamp`: Collection timestamp
 - `device`: Device name (stretch/smile)
 - `appliance`: Appliance name
@@ -92,6 +92,11 @@ The collector creates CSV files with the following columns:
 - `measurement_timestamp`: Original measurement timestamp
 - `module_id`: Plugwise module ID
 - `meter_id`: Electricity meter ID
+
+### File Naming
+- **Daily files**: `power_usage_YYYYMMDD.csv` (e.g., `power_usage_20250712.csv`)
+- **Automatic rotation**: New file created each day at 00:00
+- **Continuous data**: All measurements for a day in single file
 
 ## Raspberry Pi Deployment
 
