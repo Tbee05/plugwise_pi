@@ -28,6 +28,7 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 
 2. **Install dependencies:**
    ```bash
+   pip install -r requirements.txt
    ```
 
 3. **Configure your devices:**
