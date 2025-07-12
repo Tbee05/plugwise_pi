@@ -1,0 +1,32 @@
+{
+  "devices": {
+    "stretch": {
+      "ip": "192.168.178.17",
+      "username": "stretch",
+      "password": "your_stretch_password",
+      "port": 80,
+      "enabled": true
+    },
+    "smile": {
+      "ip": "192.168.178.35",
+      "username": "smile", 
+      "password": "your_smile_password",
+      "port": 80,
+      "enabled": true
+    }
+  },
+  "collection": {
+    "interval": 60,
+    "timeout": 10,
+    "retry_attempts": 3
+  },
+  "output": {
+    "format": "csv",
+    "directory": "data",
+    "filename_pattern": "power_usage_{timestamp}.csv"
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/collector.log"
+  }
+} 

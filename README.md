@@ -1,214 +1,181 @@
-# Plugwise Pi - Domotics Data Collection System
+# Plugwise Data Collector
 
-A Python-based system for collecting and managing data from Plugwise domotics devices on Raspberry Pi.
-
-## Overview
-
-This project provides tools and utilities to:
-- Connect to Plugwise domotics devices
-- Collect sensor data and energy consumption metrics
-- Store and manage data efficiently
-- Provide APIs for data access
-- Monitor system health and performance
+A Python-based data collector for Plugwise Stretch and Smile devices that extracts power usage data and saves it to CSV files.
 
 ## Features
 
-- **Data Collection**: Automated collection from Plugwise devices
-- **Data Storage**: Efficient local storage with SQLite/PostgreSQL options
-- **API Interface**: RESTful API for data access
-- **Monitoring**: System health and performance monitoring
-- **Configuration**: Flexible configuration management
-- **Logging**: Comprehensive logging system
-
-## Requirements
-
-- Python 3.8+
-- Raspberry Pi (tested on Pi 4)
-- Plugwise domotics devices
-- Network connectivity
+- 🔌 Real-time power consumption monitoring
+- 📊 CSV data export with timestamps
+- 🔄 Continuous data collection with configurable intervals
+- 🛡️ Error handling and retry logic
+- 📝 Clean CLI interface
 
 ## Installation
 
 ### Prerequisites
 
-```bash
-# Update system packages
-sudo apt update && sudo apt upgrade -y
+- Python 3.7+
+- Network access to Plugwise devices
+- Device credentials (username/password)
 
-# Install Python dependencies
-sudo apt install python3 python3-pip python3-venv
+### Setup
 
-# Install additional system dependencies
-sudo apt install sqlite3 postgresql-client
-```
+1. **Clone or download the project:**
+   ```bash
+   git clone <repository-url>
+   cd plugwise_pi
+   ```
 
-### Project Setup
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd plugwise_pi
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy configuration template
-cp config/config.example.yaml config/config.yaml
-
-# Edit configuration
-nano config/config.yaml
-```
-
-## Configuration
-
-Edit `config/config.yaml` to configure your Plugwise devices and system settings:
-
-```yaml
-# Plugwise device configuration
-plugwise:
-  devices:
-    - name: "Living Room"
-      mac_address: "00:01:02:03:04:05"
-      type: "circle"
-    - name: "Kitchen"
-      mac_address: "00:01:02:03:04:06"
-      type: "circle"
-
-# Database configuration
-database:
-  type: "sqlite"  # or "postgresql"
-  path: "data/plugwise.db"
-  # For PostgreSQL:
-  # host: "localhost"
-  # port: 5432
-  # name: "plugwise"
-  # user: "plugwise_user"
-  # password: "your_password"
-
-# API configuration
-api:
-  host: "0.0.0.0"
-  port: 8080
-  debug: false
-
-# Logging configuration
-logging:
-  level: "INFO"
-  file: "logs/plugwise.log"
-  max_size: "10MB"
-  backup_count: 5
-```
+3. **Configure your devices:**
+   Copy the example config and edit with your device details:
+   ```bash
+   cp config.example.json config.json
+   nano config.json
+   ```
+   ```json
+   {
+     "devices": {
+       "stretch": {
+         "ip": "192.168.178.17",
+         "username": "stretch",
+         "password": "your_password",
+         "port": 80,
+         "enabled": true
+       }
+     }
+   }
+   ```
 
 ## Usage
 
-### Starting the Data Collector
+### Single Collection
 
+Collect data once and save to CSV:
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Start data collection
-python -m plugwise_pi.collector
+python plugwise_collector.py --single --output data/
 ```
 
-### Starting the API Server
+### Continuous Collection
 
+Collect data every 60 seconds:
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Start API server
-python -m plugwise_pi.api
+python plugwise_collector.py --continuous --interval 60 --output data/
 ```
 
-### Running Tests
+### Custom Configuration
 
+Use a custom config file:
 ```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Run tests
-pytest tests/
+python plugwise_collector.py --config my_config.json --continuous
 ```
 
-## Project Structure
+### Command Line Options
 
-```
-plugwise_pi/
-├── README.md                 # This file
-├── requirements.txt          # Python dependencies
-├── setup.py                 # Package setup
-├── config/                  # Configuration files
-│   ├── config.example.yaml  # Example configuration
-│   └── config.yaml          # Your configuration (create from example)
-├── plugwise_pi/            # Main package
-│   ├── __init__.py
-│   ├── collector.py         # Data collection module
-│   ├── api.py              # API server
-│   ├── database.py          # Database operations
-│   ├── models.py            # Data models
-│   └── utils.py             # Utility functions
-├── tests/                   # Test files
-│   ├── __init__.py
-│   ├── test_collector.py
-│   ├── test_api.py
-│   └── test_database.py
-├── data/                    # Data storage (created automatically)
-├── logs/                    # Log files (created automatically)
-└── docs/                    # Documentation
-    └── api.md              # API documentation
-```
+- `--config, -c`: Configuration file path
+- `--interval, -i`: Collection interval in seconds (default: 60)
+- `--output, -o`: Output directory (default: data)
+- `--continuous, -C`: Run continuous collection
+- `--single, -s`: Run single collection (default)
 
-## Development
+## Output Format
 
-### Adding New Features
+The collector creates CSV files with the following columns:
+- `timestamp`: Collection timestamp
+- `device`: Device name (stretch/smile)
+- `appliance`: Appliance name
+- `power_watts`: Current power consumption in Watts
+- `measurement_timestamp`: Original measurement timestamp
+- `module_id`: Plugwise module ID
+- `meter_id`: Electricity meter ID
 
-1. Create feature branch: `git checkout -b feature/new-feature`
-2. Implement changes
-3. Add tests
-4. Update documentation
-5. Submit pull request
+## Raspberry Pi Deployment
 
-### Code Style
+### System Service Setup
 
-This project follows PEP 8 style guidelines. Use `black` for code formatting:
+1. **Create a systemd service file:**
+   ```bash
+   sudo nano /etc/systemd/system/plugwise-collector.service
+   ```
 
+2. **Add the service configuration:**
+   ```ini
+   [Unit]
+   Description=Plugwise Data Collector
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=pi
+   WorkingDirectory=/home/pi/plugwise_pi
+   ExecStart=/usr/bin/python3 /home/pi/plugwise_pi/plugwise_collector.py --continuous --interval 60 --output /home/pi/plugwise_pi/data
+   Restart=always
+   RestartSec=10
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+3. **Enable and start the service:**
+   ```bash
+   sudo systemctl enable plugwise-collector
+   sudo systemctl start plugwise-collector
+   sudo systemctl status plugwise-collector
+   ```
+
+### Logs
+
+Check service logs:
 ```bash
-pip install black
-black plugwise_pi/ tests/
+sudo journalctl -u plugwise-collector -f
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Permission denied**: Ensure proper file permissions
-2. **Database connection failed**: Check database configuration
-3. **Device not found**: Verify MAC addresses and network connectivity
+1. **Connection refused:**
+   - Check device IP addresses in config
+   - Verify network connectivity
+   - Confirm device credentials
 
-### Logs
+2. **No data collected:**
+   - Verify devices are powered on
+   - Check appliance mappings
+   - Review XML structure changes
 
-Check logs in the `logs/` directory for detailed error information.
+3. **Permission errors:**
+   - Ensure output directory is writable
+   - Check file permissions
 
-## Contributing
+### Debug Mode
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+Run with verbose output:
+```bash
+python plugwise_collector.py --single --output data/ 2>&1 | tee debug.log
+```
+
+## Configuration
+
+### Device Configuration
+
+Each device requires:
+- `ip`: Device IP address
+- `username`: Authentication username
+- `password`: Authentication password
+- `port`: HTTP port (usually 80)
+- `enabled`: Enable/disable device
+
+### Collection Settings
+
+- `interval`: Collection frequency in seconds
+- `timeout`: HTTP request timeout
+- `retry_attempts`: Number of retry attempts
 
 ## License
 
-[Add your license here]
-
-## Support
-
-For issues and questions:
-- Create an issue in the repository
-- Check the documentation in `docs/`
-- Review the logs for error details 
+This project is licensed under the MIT License. 
