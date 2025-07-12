@@ -1,14 +1,18 @@
 # Plugwise Data Collector
 
-A Python-based data collector for Plugwise Stretch and Smile devices that extracts power usage data and saves it to CSV files.
+A Python-based data collector for Plugwise Stretch and Smile devices that extracts power usage data and meter readings, saving them to CSV files with daily rotation.
 
 ## Features
 
 - 🔌 Real-time power consumption monitoring
 - 📊 CSV data export with timestamps
 - 🔄 Continuous data collection with configurable intervals
+- 📈 Daily meter data collection (once per day)
 - 🛡️ Error handling and retry logic
 - 📝 Clean CLI interface
+- 🗂️ Automatic daily file rotation
+- 📋 Session files with date ranges
+- ⚡ Graceful shutdown handling
 
 ## Installation
 
@@ -19,6 +23,33 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 - Device credentials (username/password)
 
 ### Setup
+
+#### macOS (Testing/Development)
+
+1. **Clone or download the project:**
+   ```bash
+   git clone <repository-url>
+   cd plugwise_pi
+   ```
+
+2. **Run the macOS setup script:**
+   ```bash
+   ./setup_mac.sh
+   ```
+
+3. **Configure your devices:**
+   Edit the configuration file:
+   ```bash
+   nano config.json
+   ```
+
+4. **Test the collector:**
+   ```bash
+   source venv/bin/activate
+   python plugwise_collector.py --single
+   ```
+
+#### Raspberry Pi (Production)
 
 1. **Clone or download the project:**
    ```bash
@@ -46,6 +77,13 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
          "password": "your_password",
          "port": 80,
          "enabled": true
+       },
+       "smile": {
+         "ip": "192.168.178.18",
+         "username": "smile",
+         "password": "your_password",
+         "port": 80,
+         "enabled": true
        }
      }
    }
@@ -53,19 +91,45 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 
 ## Usage
 
-### Single Collection
+### Main Collector
+
+The main collector (`plugwise_collector.py`) handles both power usage and meter data:
+
+#### Single Collection
 
 Collect data once and save to CSV:
 ```bash
 python plugwise_collector.py --single --output data/
 ```
 
-### Continuous Collection
+#### Continuous Collection
 
 Collect data every 60 seconds with daily file rotation:
 ```bash
 python plugwise_collector.py --continuous --interval 60 --output data/
 # Creates: power_usage_20250712.csv, power_usage_20250713.csv, etc.
+```
+
+#### Meter Data Collection
+
+Control meter data collection:
+```bash
+# Collect power data only (no meter data)
+python plugwise_collector.py --continuous --no-meters
+
+# Collect both power and meter data (default)
+python plugwise_collector.py --continuous
+
+# Collect meter data only
+python plugwise_collector.py --meters-only
+```
+
+### Daily Meter Collector
+
+For Smile devices only, collect cumulative meter data once per day:
+```bash
+python daily_meter_collector.py --output data/
+# Creates: daily_meters_20250712_20250712.csv
 ```
 
 ### Custom Configuration
@@ -77,15 +141,26 @@ python plugwise_collector.py --config my_config.json --continuous
 
 ### Command Line Options
 
+#### Main Collector
 - `--config, -c`: Configuration file path
 - `--interval, -i`: Collection interval in seconds (default: 60)
 - `--output, -o`: Output directory (default: data)
 - `--continuous, -C`: Run continuous collection
 - `--single, -s`: Run single collection (default)
+- `--no-meters`: Disable meter data collection
+- `--meters-only`: Collect meter data only (no power data)
+
+#### Daily Meter Collector
+- `--config, -c`: Configuration file path
+- `--output, -o`: Output directory (default: data)
+- `--start-date`: Start date (YYYY-MM-DD, default: today)
+- `--end-date`: End date (YYYY-MM-DD, default: today)
 
 ## Output Format
 
-The collector creates daily CSV files (00:00-23:59) with the following columns:
+### Power Usage Data
+
+Daily CSV files (00:00-23:59) with columns:
 - `timestamp`: Collection timestamp
 - `device`: Device name (stretch/smile)
 - `appliance`: Appliance name
@@ -94,14 +169,58 @@ The collector creates daily CSV files (00:00-23:59) with the following columns:
 - `module_id`: Plugwise module ID
 - `meter_id`: Electricity meter ID
 
+### Meter Data
+
+Session CSV files with cumulative meter readings:
+- `timestamp`: Collection timestamp
+- `device`: Device name (smile)
+- `electricity_consumed_peak_kwh`: Peak electricity consumption
+- `electricity_consumed_off_peak_kwh`: Off-peak electricity consumption
+- `electricity_produced_peak_kwh`: Peak electricity production
+- `electricity_produced_off_peak_kwh`: Off-peak electricity production
+- `gas_consumed_m3`: Gas consumption
+- `net_electricity_kwh`: Net electricity consumption
+
+### Daily Meter Data
+
+Wide-format CSV files with one row per day:
+- `date`: Date (YYYY-MM-DD)
+- `electricity_consumed_peak_kwh`: Daily peak consumption
+- `electricity_consumed_off_peak_kwh`: Daily off-peak consumption
+- `electricity_produced_peak_kwh`: Daily peak production
+- `electricity_produced_off_peak_kwh`: Daily off-peak production
+- `gas_consumed_m3`: Daily gas consumption
+- `net_electricity_kwh`: Daily net electricity
+
 ### File Naming
-- **Daily files**: `power_usage_YYYYMMDD.csv` (e.g., `power_usage_20250712.csv`)
-- **Automatic rotation**: New file created each day at 00:00
-- **Continuous data**: All measurements for a day in single file
+- **Daily power files**: `power_usage_YYYYMMDD.csv` (e.g., `power_usage_20250712.csv`)
+- **Session meter files**: `meter_data_YYYYMMDD_HHMMSS_YYYYMMDD_HHMMSS.csv`
+- **Daily meter files**: `daily_meters_YYYYMMDD_YYYYMMDD.csv`
+- **Automatic rotation**: New files created each day at 00:00
+
+## Data Collection Strategy
+
+### Power Usage
+- Collected continuously at specified intervals
+- Real-time power consumption monitoring
+- Daily file rotation
+
+### Meter Data
+- Collected once per day (at script start and midnight)
+- Cumulative meter readings
+- Session-based file naming with date ranges
 
 ## Raspberry Pi Deployment
 
-### System Service Setup
+### Deployment Options
+
+#### Option 1: Systemd Service (Recommended)
+Best for production - starts automatically on boot and restarts on failure.
+
+#### Option 2: Manual Execution
+Direct execution - good for testing and development.
+
+### Systemd Service Setup (Option 1)
 
 1. **Create a systemd service file:**
    ```bash
@@ -157,6 +276,11 @@ sudo journalctl -u plugwise-collector -f
 3. **Permission errors:**
    - Ensure output directory is writable
    - Check file permissions
+
+4. **File I/O errors:**
+   - Check disk space
+   - Verify file permissions
+   - Ensure graceful shutdown
 
 ### Debug Mode
 
