@@ -28,7 +28,7 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 
 1. **Clone or download the project:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Tbee05/plugwise_pi.git
    cd plugwise_pi
    ```
 
@@ -53,7 +53,7 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 
 1. **Clone or download the project:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Tbee05/plugwise_pi.git
    cd plugwise_pi
    ```
 
