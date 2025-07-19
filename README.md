@@ -51,19 +51,15 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
 
 #### Raspberry Pi (Production)
 
+**Recommended: Automated Installation**
+
 1. **Clone or download the project:**
    ```bash
    git clone <repository-url>
    cd plugwise_pi
    ```
 
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Configure your devices:**
-   Copy the example config and edit with your device details:
+2. **Configure your devices first:**
    ```bash
    cp config.example.json config.json
    nano config.json
@@ -87,6 +83,89 @@ A Python-based data collector for Plugwise Stretch and Smile devices that extrac
        }
      }
    }
+   ```
+
+3. **Run the automated installation script:**
+   ```bash
+   chmod +x install.sh
+   ./install.sh
+   ```
+
+   This script will:
+   - Update system packages
+   - Install Python dependencies
+   - Create application directory at `/home/pi/plugwise_pi`
+   - Set up Python virtual environment
+   - Create and enable systemd service
+   - Set up log rotation
+   - Create test script
+
+4. **Test the installation:**
+   ```bash
+   python3 /home/pi/plugwise_pi/test_collector.py
+   ```
+
+**Alternative: Manual Installation (Advanced Users)**
+
+If you prefer manual installation:
+
+1. **Install system dependencies:**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y python3 python3-pip python3-venv
+   ```
+
+2. **Create application directory:**
+   ```bash
+   mkdir -p /home/pi/plugwise_pi
+   cd /home/pi/plugwise_pi
+   ```
+
+3. **Copy project files:**
+   ```bash
+   cp /path/to/your/project/*.py ./
+   cp /path/to/your/project/config.json ./
+   cp /path/to/your/project/requirements.txt ./
+   ```
+
+4. **Set up Python environment:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+5. **Create systemd service manually:**
+   ```bash
+   sudo nano /etc/systemd/system/plugwise-collector.service
+   ```
+   
+   Add the service configuration:
+   ```ini
+   [Unit]
+   Description=Plugwise Data Collector
+   After=network.target
+
+   [Service]
+   Type=simple
+   User=pi
+   WorkingDirectory=/home/pi/plugwise_pi
+   ExecStart=/home/pi/plugwise_pi/venv/bin/python /home/pi/plugwise_pi/plugwise_collector.py --continuous --interval 60 --output /home/pi/plugwise_pi/data
+   Restart=always
+   RestartSec=10
+   StandardOutput=journal
+   StandardError=journal
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+6. **Enable and start service:**
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable plugwise-collector
+   sudo systemctl start plugwise-collector
    ```
 
 ## Usage
@@ -212,51 +291,44 @@ Wide-format CSV files with one row per day:
 
 ## Raspberry Pi Deployment
 
-### Deployment Options
+### Service Management
 
-#### Option 1: Systemd Service (Recommended)
-Best for production - starts automatically on boot and restarts on failure.
+After installation, manage the service with:
 
-#### Option 2: Manual Execution
-Direct execution - good for testing and development.
-
-### Systemd Service Setup (Option 1)
-
-1. **Create a systemd service file:**
-   ```bash
-   sudo nano /etc/systemd/system/plugwise-collector.service
-   ```
-
-2. **Add the service configuration:**
-   ```ini
-   [Unit]
-   Description=Plugwise Data Collector
-   After=network.target
-
-   [Service]
-   Type=simple
-   User=pi
-   WorkingDirectory=/home/pi/plugwise_pi
-   ExecStart=/usr/bin/python3 /home/pi/plugwise_pi/plugwise_collector.py --continuous --interval 60 --output /home/pi/plugwise_pi/data
-   Restart=always
-   RestartSec=10
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-3. **Enable and start the service:**
-   ```bash
-   sudo systemctl enable plugwise-collector
-   sudo systemctl start plugwise-collector
-   sudo systemctl status plugwise-collector
-   ```
-
-### Logs
-
-Check service logs:
 ```bash
+# Check service status
+sudo systemctl status plugwise-collector
+
+# View live logs
 sudo journalctl -u plugwise-collector -f
+
+# Start service
+sudo systemctl start plugwise-collector
+
+# Stop service
+sudo systemctl stop plugwise-collector
+
+# Restart service
+sudo systemctl restart plugwise-collector
+
+# Disable service (won't start on boot)
+sudo systemctl disable plugwise-collector
+```
+
+### Data Location
+
+- **Application**: `/home/pi/plugwise_pi/`
+- **Data files**: `/home/pi/plugwise_pi/data/`
+- **Logs**: `/home/pi/plugwise_pi/logs/`
+- **Configuration**: `/home/pi/plugwise_pi/config.json`
+
+### Manual Testing
+
+Test the collector manually:
+```bash
+cd /home/pi/plugwise_pi
+source venv/bin/activate
+python plugwise_collector.py --single
 ```
 
 ## Troubleshooting
@@ -276,17 +348,44 @@ sudo journalctl -u plugwise-collector -f
 3. **Permission errors:**
    - Ensure output directory is writable
    - Check file permissions
+   - Run: `sudo chown -R pi:pi /home/pi/plugwise_pi`
 
 4. **File I/O errors:**
-   - Check disk space
+   - Check disk space: `df -h`
    - Verify file permissions
    - Ensure graceful shutdown
+
+5. **Service won't start:**
+   - Check logs: `sudo journalctl -u plugwise-collector -n 50`
+   - Verify Python path: `which python3`
+   - Check virtual environment: `ls -la /home/pi/plugwise_pi/venv/`
+
+6. **Python import errors:**
+   - Reinstall dependencies: `pip install -r requirements.txt`
+   - Check Python version: `python3 --version`
+   - Verify virtual environment activation
 
 ### Debug Mode
 
 Run with verbose output:
 ```bash
+cd /home/pi/plugwise_pi
+source venv/bin/activate
 python plugwise_collector.py --single --output data/ 2>&1 | tee debug.log
+```
+
+### Log Analysis
+
+Check service logs for errors:
+```bash
+# Recent logs
+sudo journalctl -u plugwise-collector --since "1 hour ago"
+
+# Error logs only
+sudo journalctl -u plugwise-collector -p err
+
+# Full log history
+sudo journalctl -u plugwise-collector --no-pager
 ```
 
 ## Configuration
